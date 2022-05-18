@@ -46,6 +46,8 @@ class PPOAgent(object):
         # rlcard arguments
         self.use_raw = False
         self.num_actions = n_actions
+        self.action_log_probs_ = torch.zeros((batch_size, n_actions), dtype=np.float32).to(device)
+        self.value_preds = torch.zeros((batch_size + 1), dtype=np.float32).to(device)
 
     def step(self, state: np.ndarray) -> int:
         ''' Predict the action given the curent state in gerenerating training data.
@@ -54,8 +56,7 @@ class PPOAgent(object):
         Returns:
             action (int): The action predicted by the ppo agent
         '''
-        with torch.no_grad():
-            action, _ = self.policy.act(state)
+        action, _, _ = self.choose_action(state)
         return int(action)
 
     def eval_step(self, state) -> Tuple[int, Dict]:
@@ -154,19 +155,22 @@ class PPOAgent(object):
     def train_rlcard(self, num_episodes: int) -> None:
         episode_rewards = []
         for e in tqdm(range(1, num_episodes + 1)):
-            state = self.env.reset()
+            trajectories = [[] for _ in range(self.num_players)]
+            state, player_id = self.env.reset()
             episode_reward = 0
             done = False
 
             while not done:
                 action, action_log_probs, value = self.choose_action(state)
                 # Generate data from the environment
-                trajectories, payoffs = env.run(is_training=False)
-                # state, action, reward, next_state, done
-                trajectories = reorganize(trajectories, payoffs)
-                (state, action, reward, next_state, done) = trajectories
-                self.memory.add(state, action, action_log_probs, next_state, reward, value, done)
+                next_state, next_player_id = env.step(action, self.use_raw)
+                payoffs = self.env.get_payoffs()
+                reward = payoffs[player_id]
+                done = self.env.is_over()
+                if player_id == 0:
+                    self.memory.add(state, action, action_log_probs, next_state, reward, value, done)
                 state = next_state
+                player_id = next_player_id
                 episode_reward += reward
             
             episode_rewards.append(episode_reward)
@@ -198,4 +202,7 @@ if __name__ == "__main__":
 
     # Set agents
     agent = PPOAgent(env, device)
-    env.set_agents([agent for _ in range(env.num_players)])
+    # env.set_agents([agent for _ in range(env.num_players)])
+    train_episodes = 10000
+    agent.train_rlcard(train_episodes)
+

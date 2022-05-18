@@ -32,7 +32,7 @@ class Memory(object):
         self.rewards[self.step].copy_(rewards)
         self.value_preds[self.step] = value_preds.copy()
         self.dones[self.step].copy_(dones)
-        self.step = (self.step + 1) % self.num_steps
+        self.step = (self.step + 1) % self.size
 
     def sample(self, num_mini_batch) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         n_steps, n_threads = self.rewards.shape[0:2]
