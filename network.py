@@ -9,14 +9,16 @@ class ActorCriticNetwork(nn.Module):
     def __init__(self, state_space, n_actions, hidden_size=128, device=torch.device("cpu")):
         super(ActorCriticNetwork, self).__init__()
         self.layers = nn.Sequential(
-            nn.linear(state_space, hidden_size),
+            nn.Linear(*state_space, hidden_size),
             nn.ReLU(),
-            nn.linear(hidden_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size),
             nn.ReLU()
         )
 
-        self.actor = nn.linear(hidden_size, n_actions)
-        self.critic = nn.linear(hidden_size, 1)
+        self.actor = nn.Linear(hidden_size, n_actions)
+        self.critic = nn.Linear(hidden_size, 1)
+
+        self.to(device)
 
     def act(self, state) -> Tuple[float, torch.Tensor]:
         """Sample an action from state."""

@@ -6,19 +6,19 @@ from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 
 class Memory(object):
     def __init__(self, size, state_shape, action_space, device=torch.device("cpu")) -> None:
-        self.states = np.zeros((size, *state_shape), dtype=np.float32).to(device)
-        if action_space.__class__.__name__ == 'Discrete':
+        self.states = torch.zeros(size, *state_shape).to(device)
+        if action_space.__class__.__name__ == 'Discrete' or type(action_space) == int:
             action_shape = 1
         else:
             action_shape = action_space.shape[0]
-        self.actions = torch.zeros((size, action_shape), dtype=np.float32).to(device)
-        self.action_log_probs = torch.zeros((size, action_shape), dtype=np.float32).to(device)
-        self.next_states = torch.zeros((size, state_shape), dtype=np.float32).to(device)
-        self.rewards = torch.zeros((size), dtype=np.float32).to(device)
-        self.advantages = torch.zeros((size + 1), dtype=np.float32).to(device)
-        self.returns = torch.zeros((size + 1), dtype=np.float32).to(device)
-        self.value_preds = torch.zeros((size + 1), dtype=np.float32).to(device)
-        self.dones = torch.zeros((size), dtype=np.float32).to(device)
+        self.actions = torch.zeros(size, action_shape).to(device)
+        self.action_log_probs = torch.zeros(size, action_shape).to(device)
+        self.next_states = torch.zeros(size, *state_shape).to(device)
+        self.rewards = torch.zeros(size).to(device)
+        self.advantages = torch.zeros(size + 1).to(device)
+        self.returns = torch.zeros(size + 1).to(device)
+        self.value_preds = torch.zeros(size + 1).to(device)
+        self.dones = torch.zeros(size).to(device)
         
         self.size = size
         self.step = 0
