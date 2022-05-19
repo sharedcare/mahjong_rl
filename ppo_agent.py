@@ -25,7 +25,18 @@ from memory import Memory
 from network import ActorCriticNetwork
 
 class PPOAgent(object):
-    def __init__(self, env, device, gamma=0.99, alpha=0.001, gae_lambda=0.95, clip_factor=0.2, batch_size=64, K_epochs=1000) -> None:
+    def __init__(self, 
+                 env, 
+                 state_shape, 
+                 num_actions, 
+                 device, 
+                 gamma=0.99, 
+                 alpha=0.001, 
+                 gae_lambda=0.95, 
+                 clip_factor=0.2, 
+                 mem_size=64,
+                 hidden_size=128, 
+                 K_epochs=1000) -> None:
         self.gamma = gamma
         self.lr = alpha
         self.gae_lambda = gae_lambda
@@ -33,21 +44,23 @@ class PPOAgent(object):
         self.K_epochs = K_epochs
         self.device = device
 
-        state_space = env.observation_space.shape
-        n_actions = env.action_space.n
+        self.env = env
 
-        self.memory = Memory(batch_size, state_space, n_actions)
+        # state_space = env.observation_space.shape
+        # n_actions = env.action_space.n
 
-        self.policy = ActorCriticNetwork(state_space, n_actions).to(device)
+        self.memory = Memory(mem_size, state_shape, num_actions)
+
+        self.policy = ActorCriticNetwork(state_shape, num_actions, hidden_size, device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
-        self.old_policy = ActorCriticNetwork(state_space, n_actions).to(device)
+        self.old_policy = ActorCriticNetwork(state_shape, num_actions, hidden_size, device)
         self.old_policy.load_state_dict(self.policy.state_dict())
 
         # rlcard arguments
         self.use_raw = False
-        self.num_actions = n_actions
-        self.action_log_probs_ = torch.zeros((batch_size, n_actions), dtype=np.float32).to(device)
-        self.value_preds = torch.zeros((batch_size + 1), dtype=np.float32).to(device)
+        self.num_actions = num_actions
+        # self.action_log_probs_ = torch.zeros((batch_size, num_actions), dtype=np.float32).to(device)
+        # self.value_preds = torch.zeros((batch_size + 1), dtype=np.float32).to(device)
 
     def step(self, state: np.ndarray) -> int:
         ''' Predict the action given the curent state in gerenerating training data.
@@ -163,7 +176,7 @@ class PPOAgent(object):
             while not done:
                 action, action_log_probs, value = self.choose_action(state)
                 # Generate data from the environment
-                next_state, next_player_id = env.step(action, self.use_raw)
+                next_state, next_player_id = self.env.step(action, self.use_raw)
                 payoffs = self.env.get_payoffs()
                 reward = payoffs[player_id]
                 done = self.env.is_over()
@@ -201,7 +214,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Set agents
-    agent = PPOAgent(env, device)
+    agent = PPOAgent(env, env.state_shape[0], env.num_actions, device)
     # env.set_agents([agent for _ in range(env.num_players)])
     train_episodes = 10000
     agent.train_rlcard(train_episodes)
