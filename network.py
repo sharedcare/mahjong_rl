@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Tuple
-from pandas import Categorical
+from torch.distributions import Categorical
 import torch
 import torch.nn as nn
 
@@ -25,17 +25,17 @@ class ActorCriticNetwork(nn.Module):
 
         self.to(device)
 
-    def act(self, state) -> Tuple[float, torch.Tensor]:
+    def act(self, state: torch.Tensor) -> Tuple[float, torch.Tensor]:
         """Sample an action from state."""
         state_feature = self.layers(state)
         action_probs = self.actor(state_feature)
         dist = Categorical(action_probs)
         action = dist.sample()
-        action_log_probs = dist.log_prob(action_probs)
+        action_log_probs = dist.log_prob(action)
 
         return action.item(), action_log_probs
 
-    def evaluate(self, state, action) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def evaluate(self, state: torch.Tensor, action: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         state_feature = self.layers(state)
         value = self.critic(state_feature)
 
@@ -46,12 +46,12 @@ class ActorCriticNetwork(nn.Module):
 
         return value, action_log_probs, dist_entropy
 
-    def get_value(self, state) -> torch.Tensor:
+    def get_value(self, state: torch.Tensor) -> torch.Tensor:
         state_feature = self.layers(state)
         value = self.critic(state_feature)
         return value
 
-    def forward(self, obs) -> torch.Tensor:
+    def forward(self, obs: torch.Tensor) -> torch.Tensor:
         state_feature = self.layers(obs)
         return state_feature
 
