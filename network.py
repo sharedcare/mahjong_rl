@@ -9,6 +9,8 @@ class ActorCriticNetwork(nn.Module):
     def __init__(self, state_space, n_actions, hidden_size=128, device=torch.device("cpu")):
         super(ActorCriticNetwork, self).__init__()
         self.layers = nn.Sequential(
+            nn.Flatten(),
+            nn.BatchNorm1d(np.array(state_space).prod()),
             nn.Linear(np.array(state_space).prod(), hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, hidden_size),
