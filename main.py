@@ -1,24 +1,25 @@
 import os
 import argparse
 
+import numpy as np
 import torch
+from tqdm import tqdm, trange
 
 import rlcard
 from rlcard.agents import RandomAgent
 from rlcard.utils import (
-    get_device,
     set_seed,
     tournament,
     reorganize,
-    Logger,
     plot_curve,
 )
 
 from ppo_agent import PPOAgent
+from utils import get_device, Logger
 
 def train(args):
     # check if gpu is available
-    device = get_device()
+    device = torch.device("cpu")
 
     # Seed numpy, torch, random
     set_seed(args.seed)
@@ -46,7 +47,9 @@ def train(args):
 
     # Start training
     with Logger(args.log_dir) as logger:
-        for episode in range(args.num_episodes):
+        t = trange(args.num_episodes)
+        for episode in t:
+            t.set_description("Episode %i" % episode)
             state, player_id = env.reset()
             episode_reward = 0
             done = False
@@ -54,7 +57,8 @@ def train(args):
             while not done:
                 if player_id == 0:
                     obs = state['obs']
-                    action, action_log_probs, value = agents[player_id].choose_action(obs)
+                    legal_actions = list(state['legal_actions'].keys())
+                    action, action_log_probs, value = agents[player_id].choose_action(obs, legal_actions)
                 else:
                     action = agents[player_id].step(state)
                 # Generate data from the environment
@@ -71,11 +75,13 @@ def train(args):
                 episode_reward += reward
 
             with torch.no_grad():
-                next_value = agents[0].policy.get_value(agents[0].memory.states[-1])
+                next_value = agents[0].policy.get_value(agents[0].memory.states[-1].unsqueeze(0))
         
             samples = agents[0].memory.sample(agents[0].num_mini_batch)
             action_loss, value_loss, entropy_loss, loss = agents[0].update(next_value, samples)
             
+            t.set_postfix(loss=loss, episode_reward=episode_reward)
+
             # Evaluate the performance. Play with random agents.
             if episode % args.evaluate_every == 0:
                 logger.log_performance(
@@ -83,8 +89,20 @@ def train(args):
                     tournament(
                         env,
                         args.num_eval_games,
-                    )[0]
+                    )[0],
+                    loss
                 )
+
+        # Get the paths
+        csv_path, fig_path = logger.csv_path, logger.fig_path
+
+        # Plot the learning curve
+        plot_curve(csv_path, fig_path, 'ppo')
+
+        # Save model
+        save_path = os.path.join(args.log_dir, 'ppo_model.pth')
+        torch.save(agent, save_path)
+        print('Model saved in', save_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("PPO agent for Mahjong")
@@ -104,7 +122,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_episodes',
         type=int,
-        default=5000,
+        default=10000,
     )
 
     parser.add_argument(
