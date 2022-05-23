@@ -22,7 +22,7 @@ from rlcard.utils import (
 )
 
 from memory import Memory
-from network import ActorCriticNetwork
+from network import ActorCriticNetwork, ActorCriticCNNNetwork
 
 class PPOAgent(object):
     def __init__(self, 
@@ -34,7 +34,10 @@ class PPOAgent(object):
                  alpha=0.001, 
                  gae_lambda=0.95, 
                  clip_factor=0.2, 
-                 mem_size=64,
+                 value_loss_coef=0.5,
+                 entropy_coef=0.01,
+                 num_mini_batch=32,
+                 mem_size=128,
                  hidden_size=128, 
                  K_epochs=1000) -> None:
         self.gamma = gamma
@@ -42,6 +45,9 @@ class PPOAgent(object):
         self.gae_lambda = gae_lambda
         self.clip_factor = clip_factor
         self.K_epochs = K_epochs
+        self.num_mini_batch = num_mini_batch
+        self.value_loss_coef = value_loss_coef
+        self.entropy_coef = entropy_coef
         self.device = device
 
         self.env = env
@@ -52,27 +58,29 @@ class PPOAgent(object):
         self.memory = Memory(mem_size, state_shape, num_actions)
 
         self.policy = ActorCriticNetwork(state_shape, num_actions, hidden_size, device)
+        self.policy.eval()
         self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
         self.old_policy = ActorCriticNetwork(state_shape, num_actions, hidden_size, device)
+        self.old_policy.eval()
         self.old_policy.load_state_dict(self.policy.state_dict())
 
         # rlcard arguments
         self.use_raw = False
         self.num_actions = num_actions
-        # self.action_log_probs_ = torch.zeros((batch_size, num_actions), dtype=np.float32).to(device)
-        # self.value_preds = torch.zeros((batch_size + 1), dtype=np.float32).to(device)
 
-    def step(self, state: np.ndarray) -> int:
+    def step(self, state: Dict) -> int:
         ''' Predict the action given the curent state in gerenerating training data.
         Args:
-            state (np.ndarray): current state
+            state (Dict): An dictionary that represents the current state
         Returns:
             action (int): The action predicted by the ppo agent
         '''
-        action, _, _ = self.choose_action(state)
+        obs = state['obs']
+        legal_actions = list(state['legal_actions'].keys())
+        action, _, _ = self.choose_action(obs, legal_actions)
         return int(action)
 
-    def eval_step(self, state) -> Tuple[int, Dict]:
+    def eval_step(self, state: Dict) -> Tuple[int, Dict]:
         ''' Predict the action given the current state for evaluation.
         Args:
             state (dict): An dictionary that represents the current state
@@ -89,9 +97,17 @@ class PPOAgent(object):
 
         return self.step(state), info
 
-    def choose_action(self, state: np.ndarray) -> Tuple[float, torch.Tensor, torch.Tensor]:
+    def get_state(self, obs: np.ndarray) -> torch.Tensor:
+        state = obs.transpose((2, 0, 1))
+        state = torch.from_numpy(state).float().to(self.device)
+        return state.unsqueeze(0)
+
+    def choose_action(self, state: np.ndarray, legal_actions: List) -> Tuple[float, torch.Tensor, torch.Tensor]:
         with torch.no_grad():
-            action, action_log_probs = self.old_policy.act(state)
+            # state = self.get_state(state)
+            state = torch.from_numpy(state).float().to(self.device)
+            state = state.unsqueeze(0)
+            action, action_log_probs = self.old_policy.act(state, legal_actions)
             value = self.old_policy.get_value(state)
 
         return action, action_log_probs, value
@@ -123,7 +139,7 @@ class PPOAgent(object):
                 value_loss = 0.5 * torch.mean(torch.max(value_loss_clipped, value_loss_unclipped))
 
                 entropy_loss = dist_entropy.mean()
-            
+
                 # total loss
                 loss = action_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_loss
 
@@ -132,7 +148,7 @@ class PPOAgent(object):
                 self.optimizer.step()
                 action_losses.append(action_loss.item())
                 value_losses.append(value_loss.item())
-                entropy_losses.append(dist_entropy.item())
+                entropy_losses.append(entropy_loss.item())
                 losses.append(loss.item())
 
             # hard update
