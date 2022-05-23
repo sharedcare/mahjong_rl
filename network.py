@@ -1,9 +1,9 @@
 import numpy as np
-from typing import Tuple
+from typing import List, Tuple
 from torch.distributions import Categorical
 import torch
 import torch.nn as nn
-
+from rlcard.utils import remove_illegal
 
 class ActorCriticNetwork(nn.Module):
     def __init__(self, state_space, n_actions, hidden_size=128, device=torch.device("cpu")):
@@ -22,14 +22,17 @@ class ActorCriticNetwork(nn.Module):
             nn.Softmax(dim=-1),
         )
         self.critic = nn.Linear(hidden_size, 1)
-
+        self.device = device
         self.to(device)
 
-    def act(self, state: torch.Tensor) -> Tuple[float, torch.Tensor]:
+    def act(self, state: torch.Tensor, legal_actions: List) -> Tuple[float, torch.Tensor]:
         """Sample an action from state."""
         state_feature = self.layers(state)
         action_probs = self.actor(state_feature)
-        dist = Categorical(action_probs)
+        action_probs = action_probs.squeeze().cpu().detach().numpy()
+        probs = remove_illegal(action_probs, legal_actions)
+        probs = torch.from_numpy(probs).float().to(self.device)
+        dist = Categorical(probs)
         action = dist.sample()
         action_log_probs = dist.log_prob(action)
 
