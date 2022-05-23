@@ -24,28 +24,39 @@ class Memory(object):
         self.step = 0
         self.device = device
 
-    def add(self, state, actions, action_log_probs, next_state, rewards, value_preds, dones) -> None:
+    def add(self, 
+            state: np.ndarray, 
+            actions: int, 
+            action_log_probs: torch.Tensor, 
+            next_state: np.ndarray, 
+            rewards: int, 
+            value_preds: torch.Tensor, 
+            dones: bool
+            ) -> None:
+        state = torch.from_numpy(state).float().to(self.device)
+        next_state = torch.from_numpy(next_state).float().to(self.device)
+        actions = torch.tensor(actions).to(self.device)
+        rewards = torch.tensor(rewards).to(self.device)
+        dones = torch.tensor(dones).to(self.device)
+        value_pred = value_preds.squeeze()
         self.states[self.step].copy_(state)
         self.actions[self.step].copy_(actions)
         self.action_log_probs[self.step].copy_(action_log_probs)
-        self.next_state[self.step].copy_(next_state)
+        self.next_states[self.step].copy_(next_state)
         self.rewards[self.step].copy_(rewards)
-        self.value_preds[self.step] = value_preds.copy()
+        self.value_preds[self.step].copy_(value_pred)
         self.dones[self.step].copy_(dones)
         self.step = (self.step + 1) % self.size
 
-    def sample(self, num_mini_batch) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        n_steps, n_threads = self.rewards.shape[0:2]
-        batch_size = n_steps * n_threads
+    def sample(self, num_mini_batch) -> Tuple:
+        assert self.size >= num_mini_batch
         
-        assert batch_size >= num_mini_batch
-        
-        mini_batch_size = batch_size // num_mini_batch
-        sampler = BatchSampler(SubsetRandomSampler(range(batch_size)), mini_batch_size, drop_last=False)
+        mini_batch_size = self.size // num_mini_batch
+        sampler = BatchSampler(SubsetRandomSampler(range(self.size)), mini_batch_size, drop_last=False)
         
         for indices in sampler:
-            states = self.states.reshape(-1, *self.states.shape[-1])[indices]
-            next_states = self.next_states.reshape(-1, self.next_states.shape[-1])[indices]
+            states = self.states.reshape(-1, *self.states.shape[1:])[indices]
+            next_states = self.next_states.reshape(-1, *self.next_states.shape[1:])[indices]
             actions = self.actions.reshape(-1, self.actions.shape[-1])[indices]
             action_log_probs = self.action_log_probs.reshape(-1, self.action_log_probs.shape[-1])[indices]
             advantages = self.advantages.reshape(-1)[indices]
