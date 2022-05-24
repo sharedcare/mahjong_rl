@@ -42,7 +42,12 @@ def train(args):
 
     agents = [agent]
     for _ in range(1, env.num_players):
-        agents.append(RandomAgent(num_actions=env.num_actions))
+        agents.append(PPOAgent(
+            env=env, 
+            state_shape=env.state_shape[0],
+            num_actions=env.num_actions,
+            device=device,
+        ))
     env.set_agents(agents)
 
     # Start training
@@ -53,7 +58,8 @@ def train(args):
             state, player_id = env.reset()
             episode_reward = 0
             done = False
-
+            for i in range(1, env.num_players):
+                agents[i].old_policy.load_state_dict(agents[0].old_policy.state_dict())
             while not done:
                 if player_id == 0:
                     obs = state['obs']
@@ -74,11 +80,10 @@ def train(args):
                 player_id = next_player_id
                 episode_reward += reward
 
-            with torch.no_grad():
-                next_value = agents[0].policy.get_value(agents[0].memory.states[-1].unsqueeze(0))
+            last_value = agents[0].get_value(agents[0].memory.states[-1].unsqueeze(0))
         
             samples = agents[0].memory.sample(agents[0].num_mini_batch)
-            action_loss, value_loss, entropy_loss, loss = agents[0].update(next_value, samples)
+            action_loss, value_loss, entropy_loss, loss = agents[0].update(last_value, samples)
             
             t.set_postfix(loss=loss, episode_reward=episode_reward)
 
@@ -101,8 +106,7 @@ def train(args):
 
         # Save model
         save_path = os.path.join(args.log_dir, 'ppo_model.pth')
-        torch.save(agent, save_path)
-        print('Model saved in', save_path)
+        agents[0].save(save_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("PPO agent for Mahjong")
@@ -122,7 +126,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_episodes',
         type=int,
-        default=10000,
+        default=30000,
     )
 
     parser.add_argument(
@@ -134,13 +138,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--evaluate_every',
         type=int,
-        default=100,
+        default=300,
     )
 
     parser.add_argument(
         '--log_dir',
         type=str,
-        default='experiments/mahjong_ppo_result/',
+        default='experiments/mahjong_ppo_self_play_result/',
     )
 
     args = parser.parse_args()
