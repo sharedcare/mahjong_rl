@@ -68,6 +68,25 @@ class PPOAgent(object):
         self.use_raw = False
         self.num_actions = num_actions
 
+    def restore(self, model_path: str) -> None:
+        ''' Load model from given path. 
+
+        Args:
+            model_path : Path to model weights
+        '''
+        pretained_model = torch.load(model_path, map_location=lambda storage, loc: storage)
+        self.policy.load_state_dict(pretained_model)
+        print('Load model from', model_path)
+
+    def save(self, save_path: str) -> None:
+        ''' Save model in designated path. 
+
+        Args:
+            save_path : Path to save model
+        '''
+        torch.save(self.policy, save_path)
+        print('Model saved in', save_path)
+
     def step(self, state: Dict) -> int:
         ''' Predict the action given the curent state in gerenerating training data.
         Args:
