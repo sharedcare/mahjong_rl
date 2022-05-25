@@ -5,7 +5,12 @@ from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 
 
 class Memory(object):
-    def __init__(self, size, state_shape, action_space, device=torch.device("cpu")) -> None:
+    def __init__(self, 
+                 size: int, 
+                 state_shape: Tuple, 
+                 action_space: Tuple, 
+                 device=torch.device("cpu")
+                 ) -> None:
         self.states = torch.zeros(size, *state_shape).to(device)
         if action_space.__class__.__name__ == 'Discrete' or type(action_space) == int:
             action_shape = 1
@@ -48,7 +53,7 @@ class Memory(object):
         self.dones[self.step].copy_(dones)
         self.step = (self.step + 1) % self.size
 
-    def sample(self, num_mini_batch) -> Tuple:
+    def sample(self, num_mini_batch: int) -> Tuple:
         assert self.size >= num_mini_batch
         
         mini_batch_size = self.size // num_mini_batch
@@ -65,13 +70,13 @@ class Memory(object):
             
             yield states, next_states, actions, action_log_probs, returns, values, advantages
 
-    def calculate_advantage(self, next_value, gamma) -> None:
+    def calculate_advantage(self, next_value: torch.Tensor, gamma: float) -> None:
         self.returns[-1] = next_value
         for step in reversed(range(self.size)):
             self.returns[step] = self.rewards[step] + gamma * self.returns[step + 1] * (1 - self.dones[step])
             self.advantages[step] = self.returns[step] - self.value_preds[step]
 
-    def calculate_gae_advantage(self, next_value, gamma, gae_lambda) -> None:
+    def calculate_gae_advantage(self, next_value: torch.Tensor, gamma: float, gae_lambda: float) -> None:
         self.value_preds[-1] = next_value
         for step in reversed(range(self.size)):
             delta = self.rewards[step] + gamma * self.value_preds[step + 1] * (1 - self.dones[step]) - self.value_preds[step]
