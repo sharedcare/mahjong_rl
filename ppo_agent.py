@@ -4,6 +4,7 @@ from sre_parse import State
 from typing import Dict, List, Tuple
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 from collections import namedtuple
@@ -89,10 +90,11 @@ class PPOAgent(object):
 
     def step(self, state: Dict) -> int:
         ''' Predict the action given the curent state in gerenerating training data.
+
         Args:
-            state (Dict): An dictionary that represents the current state
+            state : A dictionary that represents the current state
         Returns:
-            action (int): The action predicted by the ppo agent
+            action : The action predicted by the ppo agent
         '''
         obs = state['obs']
         legal_actions = list(state['legal_actions'].keys())
@@ -101,11 +103,12 @@ class PPOAgent(object):
 
     def eval_step(self, state: Dict) -> Tuple[int, Dict]:
         ''' Predict the action given the current state for evaluation.
+
         Args:
-            state (dict): An dictionary that represents the current state
+            state : A dictionary that represents the current state
         Returns:
-            action (int): The action predicted by the ppo agent
-            probs (list): The list of action probabilities
+            action : The action predicted by the ppo agent
+            probs : The list of action probabilities
         '''
         probs = [0 for _ in range(self.num_actions)]
         for i in state['legal_actions']:
@@ -117,11 +120,29 @@ class PPOAgent(object):
         return self.step(state), info
 
     def get_state(self, obs: np.ndarray) -> torch.Tensor:
+        ''' Formulate and convert numpy state to torch tensor.
+
+        Args:
+            obs : A numpy array that represents the current state
+        Returns:
+            state : A torch tensor of the reformed state
+        '''
         state = obs.transpose((2, 0, 1))
         state = torch.from_numpy(state).float().to(self.device)
         return state.unsqueeze(0)
 
     def choose_action(self, state: np.ndarray, legal_actions: List) -> Tuple[float, torch.Tensor, torch.Tensor]:
+        ''' Choose action from the given state using old policy.
+
+        Args:
+            state : A numpy array that represents the current state
+            legal_actions : A list of available actions
+        Returns:
+            action : Choosed action from actor
+            action_log_probs : Log of action probabilities
+            value : Critic value
+        '''
+        self.old_policy.eval()
         with torch.no_grad():
             # state = self.get_state(state)
             state = torch.from_numpy(state).float().to(self.device)
@@ -131,7 +152,32 @@ class PPOAgent(object):
 
         return action, action_log_probs, value
 
-    def update(self, next_value, samples) -> Tuple[List[float], List[float], List[float], List[float]]:
+    def get_value(self, state: torch.Tensor):
+        ''' Get critic value from the given state using current policy.
+
+        Args:
+            state : A torch tensor that represents the current state
+        Returns:
+            value : Critic value
+        '''
+        self.policy.eval()
+        with torch.no_grad():
+            value = self.policy.get_value(state)
+
+        return value
+
+    def update(self, next_value: torch.Tensor, samples: Tuple) -> Tuple[List[float], List[float], List[float], List[float]]:
+        ''' PPO update.
+
+        Args:
+            next_value : Value of the last state in the memory buffer
+            samples: Samples from memory
+        Returns:
+            action_loss : Action loss
+            value_loss : Value loss
+            entropy_loss : Entropy loss
+            loss: Mean value of total loss
+        '''
         action_losses = []
         value_losses = []
         entropy_losses = []
