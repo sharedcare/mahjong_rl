@@ -58,11 +58,11 @@ class PPOAgent(object):
         self.memory = Memory(mem_size, state_shape, num_actions)
 
         self.policy = ActorCriticNetwork(state_shape, num_actions, hidden_size, device)
-        self.policy.eval()
         self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
         self.old_policy = ActorCriticNetwork(state_shape, num_actions, hidden_size, device)
-        self.old_policy.eval()
         self.old_policy.load_state_dict(self.policy.state_dict())
+
+        self.MSE_loss = nn.MSELoss()
 
         # rlcard arguments
         self.use_raw = False
@@ -136,7 +136,9 @@ class PPOAgent(object):
         value_losses = []
         entropy_losses = []
         losses = []
-        self.memory.calculate_gae_advantage(next_value, self.gamma, self.gae_lambda)
+        # self.memory.calculate_gae_advantage(next_value, self.gamma, self.gae_lambda)
+        self.memory.calculate_advantage(next_value, self.gamma)
+        self.policy.train()
         
         for _ in range(self.K_epochs):
             for states, next_states, actions, old_action_log_probs, returns, values, advantages in samples:
@@ -152,15 +154,16 @@ class PPOAgent(object):
                 action_loss = -1 * torch.min(surr1, surr2).mean()
 
                 # calculate value loss
-                value_loss_unclipped = torch.square(new_values - returns)
-                values_clipped = values + torch.clamp(new_values - values, -self.clip_factor, self.clip_factor)
-                value_loss_clipped = torch.square(values_clipped - returns)
-                value_loss = 0.5 * torch.mean(torch.max(value_loss_clipped, value_loss_unclipped))
+                # value_loss_unclipped = torch.square(new_values - returns)
+                # values_clipped = values + torch.clamp(new_values - values, -self.clip_factor, self.clip_factor)
+                # value_loss_clipped = torch.square(values_clipped - returns)
+                # value_loss = self.value_loss_coef * torch.mean(torch.max(value_loss_clipped, value_loss_unclipped))
+                value_loss = self.value_loss_coef * self.MSE_loss(returns, new_values.squeeze())
 
-                entropy_loss = dist_entropy.mean()
+                entropy_loss = self.entropy_coef * dist_entropy.mean()
 
                 # total loss
-                loss = action_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_loss
+                loss = action_loss + value_loss - entropy_loss
 
                 self.optimizer.zero_grad()
                 loss.backward()
