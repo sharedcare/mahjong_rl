@@ -6,7 +6,6 @@ import torch
 from tqdm import tqdm, trange
 
 import rlcard
-from rlcard.agents import RandomAgent
 from rlcard.utils import (
     set_seed,
     tournament,
@@ -126,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_episodes',
         type=int,
-        default=30000,
+        default=50000,
     )
 
     parser.add_argument(
@@ -138,13 +137,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--evaluate_every',
         type=int,
-        default=300,
+        default=500,
     )
 
     parser.add_argument(
         '--log_dir',
         type=str,
-        default='experiments/mahjong_ppo_self_play_result/',
+        default='experiments/mahjong_ppo_sp_result/',
     )
 
     args = parser.parse_args()
