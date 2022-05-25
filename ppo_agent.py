@@ -36,9 +36,9 @@ class PPOAgent(object):
                  clip_factor=0.2, 
                  value_loss_coef=0.5,
                  entropy_coef=0.01,
-                 num_mini_batch=32,
-                 mem_size=128,
-                 hidden_size=128, 
+                 num_mini_batch=16,
+                 mem_size=512,
+                 hidden_size=64, 
                  K_epochs=1000) -> None:
         self.gamma = gamma
         self.lr = alpha
