@@ -97,15 +97,16 @@ def train(args):
                     loss
                 )
 
+            if episode != 0 and episode % args.save_every == 0:
+                # Save model
+                save_path = os.path.join(args.log_dir, 'ppo_model.pth')
+                agents[0].save(save_path)
+
         # Get the paths
         csv_path, fig_path = logger.csv_path, logger.fig_path
 
         # Plot the learning curve
         plot_curve(csv_path, fig_path, 'ppo')
-
-        # Save model
-        save_path = os.path.join(args.log_dir, 'ppo_model.pth')
-        agents[0].save(save_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("PPO agent for Mahjong")
@@ -138,6 +139,12 @@ if __name__ == '__main__':
         '--evaluate_every',
         type=int,
         default=500,
+    )
+
+    parser.add_argument(
+        '--save_every',
+        type=int,
+        default=5000,
     )
 
     parser.add_argument(
