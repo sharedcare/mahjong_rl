@@ -75,9 +75,10 @@ class PPOAgent(object):
         Args:
             model_path : Path to model weights
         '''
+        print('Load model from', model_path)
         pretained_model = torch.load(model_path, map_location=lambda storage, loc: storage)
         self.policy.load_state_dict(pretained_model)
-        print('Load model from', model_path)
+        self.old_policy.load_state_dict(self.policy.state_dict())
 
     def save(self, save_path: str) -> None:
         ''' Save model in designated path. 
@@ -85,8 +86,8 @@ class PPOAgent(object):
         Args:
             save_path : Path to save model
         '''
-        torch.save(self.policy, save_path)
-        print('Model saved in', save_path)
+        torch.save(self.policy.state_dict(), save_path)
+        # print('Model saved in', save_path)
 
     def step(self, state: Dict) -> int:
         ''' Predict the action given the curent state in gerenerating training data.
@@ -200,11 +201,11 @@ class PPOAgent(object):
                 action_loss = -1 * torch.min(surr1, surr2).mean()
 
                 # calculate value loss
-                # value_loss_unclipped = torch.square(new_values - returns)
-                # values_clipped = values + torch.clamp(new_values - values, -self.clip_factor, self.clip_factor)
-                # value_loss_clipped = torch.square(values_clipped - returns)
-                # value_loss = self.value_loss_coef * torch.mean(torch.max(value_loss_clipped, value_loss_unclipped))
-                value_loss = self.value_loss_coef * self.MSE_loss(returns, new_values.squeeze())
+                value_loss_unclipped = torch.square(new_values - returns)
+                values_clipped = values + torch.clamp(new_values - values, -self.clip_factor, self.clip_factor)
+                value_loss_clipped = torch.square(values_clipped - returns)
+                value_loss = self.value_loss_coef * torch.mean(torch.max(value_loss_clipped, value_loss_unclipped))
+                # value_loss = self.value_loss_coef * self.MSE_loss(returns, new_values.squeeze())
 
                 entropy_loss = self.entropy_coef * dist_entropy.mean()
 
