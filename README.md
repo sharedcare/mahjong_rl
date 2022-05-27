@@ -12,10 +12,14 @@ Train PPO Agent
 ```
 python main.py --log_dir 'experiments/mahjong_ppo_result/'
 ```
+Play Demo with trained agent
+```
+python demo.py
+```
 
 ## Todo
 - [x] PPO Agent
-- [ ] Demo
+- [x] Demo
 - [ ] IPPO Agent
 - [ ] MAPPO Agent
 - [ ] SAC Agent
