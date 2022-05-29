@@ -79,10 +79,9 @@ def train(args):
                 player_id = next_player_id
                 episode_reward += reward
 
-            last_value = agents[0].get_value(agents[0].memory.states[-1].unsqueeze(0))
+            last_value = agents[0].get_value(agents[0].memory.next_states[-1].unsqueeze(0))
         
-            samples = agents[0].memory.sample(agents[0].num_mini_batch)
-            action_loss, value_loss, entropy_loss, loss = agents[0].update(last_value, samples)
+            action_loss, value_loss, entropy_loss, loss = agents[0].update(last_value)
             
             t.set_postfix(loss=loss, episode_reward=episode_reward)
 
@@ -126,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_episodes',
         type=int,
-        default=50000,
+        default=10000,
     )
 
     parser.add_argument(
@@ -138,13 +137,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--evaluate_every',
         type=int,
-        default=500,
+        default=100,
     )
 
     parser.add_argument(
         '--save_every',
         type=int,
-        default=5000,
+        default=1000,
     )
 
     parser.add_argument(
