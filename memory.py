@@ -77,8 +77,9 @@ class Memory(object):
             self.advantages[step] = self.returns[step] - self.value_preds[step]
 
     def calculate_gae_advantage(self, next_value: torch.Tensor, gamma: float, gae_lambda: float) -> None:
-        self.value_preds[-1] = next_value
+        self.returns[-1] = next_value
         for step in reversed(range(self.size)):
+            self.returns[step] = self.rewards[step] + gamma * self.returns[step + 1] * (1 - self.dones[step])
             delta = self.rewards[step] + gamma * self.value_preds[step + 1] * (1 - self.dones[step]) - self.value_preds[step]
             self.advantages[step] = delta + gamma * gae_lambda * self.advantages[step + 1] * (1 - self.dones[step])
             self.returns[step] = self.advantages[step] + self.value_preds[step]
