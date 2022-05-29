@@ -1,6 +1,3 @@
-import argparse
-import pprint
-from sre_parse import State
 from typing import Dict, List, Tuple
 import numpy as np
 import torch
@@ -23,7 +20,7 @@ from rlcard.utils import (
 )
 
 from memory import Memory
-from network import ActorCriticNetwork, ActorCriticCNNNetwork
+from network import ActorCriticNetwork, ActorCriticCNNNetwork, ActorCriticSeparateNetwork
 
 class PPOAgent(object):
     def __init__(self, 
@@ -167,7 +164,7 @@ class PPOAgent(object):
 
         return value
 
-    def update(self, next_value: torch.Tensor, samples: Tuple) -> Tuple[List[float], List[float], List[float], List[float]]:
+    def update(self, next_value: torch.Tensor) -> Tuple[List[float], List[float], List[float], List[float]]:
         ''' PPO update.
 
         Args:
@@ -188,6 +185,7 @@ class PPOAgent(object):
         self.policy.train()
         
         for _ in range(self.K_epochs):
+            samples = self.memory.sample(self.num_mini_batch)
             for states, next_states, actions, old_action_log_probs, returns, values, advantages in samples:
                 advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
                 new_values, action_log_probs, dist_entropy = self.policy.evaluate(states, actions)
