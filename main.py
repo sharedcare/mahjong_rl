@@ -82,6 +82,7 @@ def train(args):
             last_value = agents[0].get_value(agents[0].memory.next_states[-1].unsqueeze(0))
         
             action_loss, value_loss, entropy_loss, loss = agents[0].update(last_value)
+            agents[0].memory.reset()
             
             t.set_postfix(loss=loss, episode_reward=episode_reward)
 

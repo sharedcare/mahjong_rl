@@ -20,7 +20,7 @@ python demo.py
 ## Todo
 - [x] PPO Agent
 - [x] Demo
-- [ ] IPPO Agent
+- [x] Distributed PPO Agent
 - [ ] MAPPO Agent
 - [ ] SAC Agent
 - [ ] Add other types of Mahjong games
