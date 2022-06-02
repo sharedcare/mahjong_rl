@@ -2,6 +2,7 @@ import os
 import csv
 
 import torch
+import torch.multiprocessing as mp
 
 def get_device():
     if torch.cuda.is_available():
@@ -16,6 +17,62 @@ def get_device():
 
     return device
 
+def ensure_shared_grads(model, shared_model):
+    for param, shared_param in zip(model.parameters(),
+                                   shared_model.parameters()):
+        if shared_param.grad is not None:
+            return
+        shared_param._grad = param.grad
+
+def plot_curve(csv_path, save_path, algorithm):
+    ''' Read data from csv file and plot the results
+    '''
+    import os
+    import csv
+    import matplotlib.pyplot as plt
+    with open(csv_path) as csvfile:
+        reader = csv.DictReader(csvfile)
+        xs = []
+        ys = []
+        for row in reader:
+            xs.append(int(row['timestep']))
+            ys.append(float(row['reward']))
+        fig, ax = plt.subplots()
+        ax.plot(xs, ys, label=algorithm)
+        ax.set(xlabel='timestep', ylabel='reward')
+        ax.legend()
+        ax.grid()
+
+        save_dir = os.path.dirname(save_path)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        fig.savefig(save_path)
+
+
+# https://github.com/alexis-jacq/Pytorch-DPPO/blob/master/utils.py
+class Counter:
+    """enable the chief to access worker's total number of updates"""
+
+    def __init__(self, val=True):
+        self.val = mp.Value("i", 0)
+        self.lock = mp.Lock()
+
+    def get(self):
+        # used by chief
+        with self.lock:
+            return self.val.value
+
+    def increment(self):
+        # used by workers
+        with self.lock:
+            self.val.value += 1
+
+    def reset(self):
+        # used by chief
+        with self.lock:
+            self.val.value = 0
+            
 
 class Logger(object):
     ''' Logger saves the running results and helps make plots from the results
